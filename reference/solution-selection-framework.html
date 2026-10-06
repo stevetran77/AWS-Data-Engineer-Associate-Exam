@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Khung chọn giải pháp AWS</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+  <h1>Khung chọn giải pháp AWS</h1>
+  <p class="lede">Không chọn dịch vụ trước. Chuyển đề bài thành các ràng buộc, rồi chọn phương án đáp ứng toàn bộ ràng buộc với ít vận hành nhất.</p>
+
+  <div class="grid">
+    <div><h2>1. Dữ liệu đến thế nào?</h2><p>Batch, streaming, request/response, hay file transfer?</p></div>
+    <div><h2>2. Cần làm gì?</h2><p>Lưu, query, transform, orchestration, catalog, hay phân quyền?</p></div>
+    <div><h2>3. Ràng buộc nào quyết định?</h2><p>Latency, replay, thứ tự, least privilege, chi phí, hay ít vận hành?</p></div>
+    <div><h2>4. Cái gì bị loại?</h2><p>Phương án thiếu dù chỉ một ràng buộc bắt buộc đều sai.</p></div>
+  </div>
+
+  <h2>Ba lớp hay bị lẫn</h2>
+  <div class="card">
+    <p><strong>Network:</strong> Có đường kết nối không? Ví dụ: VPC endpoint, route table, security group, port.</p>
+    <p><strong>IAM:</strong> Principal có được gọi AWS API không? Ví dụ: Lambda execution role có <code>kinesis:GetRecords</code> hoặc <code>dynamodb:PutItem</code>.</p>
+    <p><strong>Data authorization:</strong> Principal có được đọc/sửa dữ liệu bên trong dịch vụ không? Ví dụ: Redshift <code>GRANT SELECT</code> hay Lake Formation column permission.</p>
+  </div>
+
+  <h2>Mẫu streaming có replay</h2>
+  <pre class="diagram">Producer → Kinesis Data Streams → Lambda → DynamoDB
+                │
+                └─ retention đủ dài → consumer mới đọc lại từ thời điểm cần replay</pre>
+  <p>“Replay” là ràng buộc chọn nguồn dữ liệu. Kinesis Data Streams giữ record trong thời hạn retention; Lambda đọc stream bằng event source mapping. Nếu đề yêu cầu xử lý lại record cũ, retention và điểm bắt đầu của consumer phải bao phủ thời điểm đó.</p>
+
+  <h2>Loại nhanh các đáp án</h2>
+  <ul>
+    <li>Đề yêu cầu custom transform → phải có compute chạy code như Lambda hoặc Glue; destination không tự thực hiện logic đó.</li>
+    <li>Đề yêu cầu replay hoặc nhiều consumer → ưu tiên stream có retention và consumer độc lập.</li>
+    <li>Đề yêu cầu “least operational overhead” → ưu tiên managed integration trước EC2/ECS/KCL tự vận hành.</li>
+    <li>Đề yêu cầu private access → tách network access khỏi IAM permission.</li>
+  </ul>
+
+  <footer>Tham khảo: <a href="https://docs.aws.amazon.com/lambda/latest/dg/invocation-eventsourcemapping.html">AWS Lambda event source mappings</a> · <a href="https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-ddb.html">Gateway endpoints for DynamoDB</a></footer>
+</main>
+</body>
+</html>

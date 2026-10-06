@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bài 1: Tư duy chọn kiến trúc streaming</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+  <h1>Chọn kiến trúc streaming bằng ràng buộc</h1>
+  <p class="lede">Mục tiêu: nhìn một câu hỏi dài và rút ra đúng pipeline trước khi nhìn đáp án.</p>
+
+  <h2>Mission liên quan</h2>
+  <p>Bạn cần chọn được giải pháp AWS cho công việc và kỳ thi, thay vì chỉ nhớ tên dịch vụ. Đây là một lỗi lặp lại trong mock test: Firehose bị chọn cho một mục tiêu mà nó không thể hoàn thành trực tiếp.</p>
+
+  <h2>Tình huống</h2>
+  <div class="card">
+    <p>Order events đến liên tục. Mỗi event cần validation và enrichment trước khi được ghi vào DynamoDB. Nếu logic xử lý có lỗi, đội ngũ cần chạy lại dữ liệu của ba ngày trước. Họ không muốn vận hành server.</p>
+  </div>
+
+  <h2>Rút đề bài thành năm ràng buộc</h2>
+  <ol class="steps">
+    <li><strong>Liên tục</strong> → streaming source.</li>
+    <li><strong>Validation + enrichment</strong> → nơi chạy custom code.</li>
+    <li><strong>DynamoDB</strong> → đích của record đã xử lý.</li>
+    <li><strong>Ba ngày trước</strong> → raw event phải tồn tại ít nhất 72 giờ và consumer phải đọc lại được.</li>
+    <li><strong>Không vận hành server</strong> → serverless/managed integration.</li>
+  </ol>
+
+  <pre class="diagram">Order producer
+     ↓
+Kinesis Data Streams  (retention ≥ 72 hours)
+     ↓  Lambda event source mapping
+Lambda  (validate + enrich)
+     ↓
+DynamoDB</pre>
+
+  <h2>Vì sao từng thành phần xuất hiện?</h2>
+  <div class="grid">
+    <div><h3>Kinesis Data Streams</h3><p>Giữ raw events trong retention window để các consumer đọc và đọc lại.</p></div>
+    <div><h3>Lambda</h3><p>Chạy validation và enrichment mà không cần quản lý server.</p></div>
+    <div><h3>Event source mapping</h3><p>Lambda tự đọc và batch records từ Kinesis.</p></div>
+    <div><h3>DynamoDB</h3><p>Lưu kết quả theo access pattern key-value của đề bài.</p></div>
+  </div>
+
+  <h2>Điểm bẫy: Firehose</h2>
+  <p>Firehose phù hợp để deliver dữ liệu đến những destination được hỗ trợ, thường là S3, Redshift, OpenSearch hoặc Splunk. Nó không ghi trực tiếp vào DynamoDB. Vì đề yêu cầu <em>custom code → DynamoDB</em>, Firehose đơn lẻ không thể là toàn bộ đáp án.</p>
+
+  <h2>Kiểm tra trí nhớ</h2>
+  <form class="quiz" id="quiz">
+    <p><strong>Đề chỉ yêu cầu:</strong> nhận clickstream liên tục và lưu raw events vào S3 với ít công vận hành nhất. Không cần custom transform, nhiều consumer, hay replay. Chọn dịch vụ phù hợp nhất.</p>
+    <label><input type="radio" name="answer" value="a"> Amazon Kinesis Data Streams + Lambda + S3</label>
+    <label><input type="radio" name="answer" value="b"> Amazon Data Firehose → Amazon S3</label>
+    <label><input type="radio" name="answer" value="c"> Amazon EC2 chạy Kinesis Client Library → S3</label>
+    <button type="button" id="check">Kiểm tra</button>
+    <p id="feedback" class="feedback" aria-live="polite"></p>
+  </form>
+
+  <h2>Ghi nhớ khi làm đề</h2>
+  <p>Hãy viết nháp năm từ: <strong>input → processing → destination → special constraint → operations</strong>. Sau đó chỉ giữ đáp án thỏa cả năm.</p>
+
+  <p><strong>Đọc chính:</strong> <a href="https://docs.aws.amazon.com/lambda/latest/dg/services-kinesis-create.html">Process Amazon Kinesis Data Streams records with Lambda</a>. Nếu phần nào chưa rõ, hãy hỏi mình bằng chính tình huống bạn đang nghĩ tới.</p>
+
+  <footer><a href="../reference/solution-selection-framework.html">Khung chọn giải pháp AWS</a> · Bài kế tiếp sẽ luyện phân biệt Network, IAM và database authorization.</footer>
+</main>
+<script>
+  document.getElementById('check').addEventListener('click', () => {
+    const chosen = document.querySelector('input[name="answer"]:checked');
+    const feedback = document.getElementById('feedback');
+    if (!chosen) {
+      feedback.className = 'feedback warn';
+      feedback.textContent = 'Hãy chọn một đáp án trước.';
+      return;
+    }
+    if (chosen.value === 'b') {
+      feedback.className = 'feedback good';
+      feedback.textContent = 'Đúng. Khi chỉ cần delivery liên tục đến S3 và ít vận hành, Firehose phù hợp. Không có ràng buộc replay hay custom processing nên Kinesis Data Streams + Lambda là thừa.';
+    } else {
+      feedback.className = 'feedback warn';
+      feedback.textContent = 'Chưa đúng. Đề không cần replay, nhiều consumer hay custom code. Giữ giải pháp tối giản: Firehose có thể deliver liên tục vào S3.';
+    }
+  });
+</script>
+</body>
+</html>
